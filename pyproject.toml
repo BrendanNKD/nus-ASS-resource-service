@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling>=1.25.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nus-ass-resource-service"
+version = "0.1.0"
+description = "Resource service with JWT cookie validation and AWS secret integration"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "boto3==1.40.35",
+  "fastapi==0.116.1",
+  "pymongo==4.14.1",
+  "pyjwt[crypto]==2.10.1",
+  "python-dotenv==1.1.1",
+  "redis==6.4.0",
+  "uvicorn[standard]==0.35.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx==0.28.1",
+  "pytest==8.4.2",
+  "pytest-cov==6.2.1",
+  "ruff==0.12.10",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "W"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
