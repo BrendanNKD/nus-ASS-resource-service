@@ -1,23 +1,68 @@
 from __future__ import annotations
 
 import logging
+from typing import Annotated, Any, TypeVar
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
+from fastapi import Body, Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ValidationError
 
 from app.auth import AuthClaims, require_auth, require_role
 from app.config import Settings, load_settings_from_env, resolve_app_env
-from app.mongo_client import close_mongo, connect_mongo
 from app.models import ResourceCreateRequest, ResourceStatus, ResourceStatusPatchRequest
+from app.mongo_client import close_mongo, connect_mongo
 from app.repository import InMemoryResourceRepository
 from app.secrets_loader import load_prod_secrets
 from app.valkey_client import close_valkey, connect_valkey
 
-
 logger = logging.getLogger(__name__)
+RequestModelT = TypeVar("RequestModelT", bound=BaseModel)
+
+
+def serialize_validation_errors(errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {
+            "loc": list(error.get("loc", ())),
+            "message": error.get("msg", "Invalid value"),
+            "type": error.get("type", "value_error"),
+        }
+        for error in errors
+    ]
+
+
+def validation_error_summary(details: list[dict[str, Any]]) -> str:
+    if not details:
+        return "Invalid request payload"
+
+    messages: list[str] = []
+    for detail in details:
+        loc = detail.get("loc", [])
+        field = ".".join(str(part) for part in loc) if isinstance(loc, list) else str(loc)
+        message = str(detail.get("message", "Invalid value"))
+        messages.append(f"{field}: {message}" if field else message)
+
+    return f"Invalid request payload: {'; '.join(messages)}"
+
+
+def invalid_payload_detail(errors: list[dict[str, Any]]) -> dict[str, object]:
+    details = serialize_validation_errors(errors)
+    return {
+        "error": validation_error_summary(details),
+        "details": details,
+    }
+
+
+def validate_request_payload(model_type: type[RequestModelT], payload: Any) -> RequestModelT:
+    try:
+        return model_type.model_validate(payload)
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=invalid_payload_detail(exc.errors()),
+        ) from exc
 
 
 def create_app(
@@ -58,8 +103,11 @@ def create_app(
         return JSONResponse(status_code=exc.status_code, content=payload, headers=exc.headers)
 
     @app.exception_handler(RequestValidationError)
-    async def validation_exception_handler(_: Request, __: RequestValidationError) -> JSONResponse:  # noqa: ANN001
-        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"error": "Invalid request payload"})
+    async def validation_exception_handler(_: Request, exc: RequestValidationError) -> JSONResponse:  # noqa: ANN001
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content=invalid_payload_detail(exc.errors()),
+        )
 
     @app.get("/api/v1/health")
     async def health() -> dict[str, str]:
@@ -71,7 +119,9 @@ def create_app(
         type_filter: str | None = Query(default=None, alias="type"),
         claims: AuthClaims = Depends(require_auth),
     ) -> dict[str, object]:
-        resources = app.state.resource_repo.list_resources(status=status_filter, resource_type=type_filter)
+        resources = app.state.resource_repo.list_resources(
+            status=status_filter, resource_type=type_filter
+        )
         return {
             "message": "Resources fetched",
             "requested_by": claims.username,
@@ -80,11 +130,12 @@ def create_app(
 
     @app.post("/api/v1/resources", status_code=status.HTTP_201_CREATED)
     async def create_resource(
-        payload: ResourceCreateRequest,
+        payload: Annotated[Any, Body()],
         _: AuthClaims = Depends(require_role("admin")),
     ) -> dict[str, object]:
+        create_payload = validate_request_payload(ResourceCreateRequest, payload)
         try:
-            resource = app.state.resource_repo.create_resource(payload)
+            resource = app.state.resource_repo.create_resource(create_payload)
         except ValueError as exc:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -99,10 +150,11 @@ def create_app(
     @app.patch("/api/v1/resources/{resource_code}/status")
     async def patch_resource_status(
         resource_code: str,
-        payload: ResourceStatusPatchRequest,
+        payload: Annotated[Any, Body()],
         _: AuthClaims = Depends(require_role("admin")),
     ) -> dict[str, object]:
-        resource = app.state.resource_repo.set_status(resource_code, payload.status)
+        patch_payload = validate_request_payload(ResourceStatusPatchRequest, payload)
+        resource = app.state.resource_repo.set_status(resource_code, patch_payload.status)
         if resource is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

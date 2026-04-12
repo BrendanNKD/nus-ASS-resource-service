@@ -18,6 +18,8 @@ Python/FastAPI resource service that validates auth cookies using the same JWT k
 ```bash
 python -m venv .venv
 source .venv/bin/activate
+.\.venv\Scripts\Activate.ps1
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 pip install -e '.[dev]'
 cp example.env .env
 uvicorn app.main:app --reload --port 8081
@@ -36,3 +38,15 @@ pytest
 - `POST /api/v1/resources` (admin)
 - `PATCH /api/v1/resources/{resource_code}/status` (admin)
 - `GET /api/v1/auth/context` (auth required)
+
+
+
+podman run -d `
+  --name resource-mongodb `
+  -p 27017:27017 `
+  -e MONGODB_ROOT_PASSWORD=root_pw `
+  -e MONGODB_USERNAME=app `
+  -e MONGODB_PASSWORD=app_pw `
+  -e MONGODB_DATABASE=resource_db `
+  -v mongodb-data:/bitnami/mongodb `
+  docker.io/bitnami/mongodb:latest

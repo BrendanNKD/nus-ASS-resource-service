@@ -76,7 +76,10 @@ def test_create_and_patch_resource_as_admin(client, make_token):
         json={"resourceCode": "R1", "name": "Clinic A", "type": "clinic"},
     )
     assert duplicate_response.status_code == 409
-    assert duplicate_response.json() == {"error": "Resource already exists", "code": "RESOURCE_CONFLICT"}
+    assert duplicate_response.json() == {
+        "error": "Resource already exists",
+        "code": "RESOURCE_CONFLICT",
+    }
 
     patch_response = client.patch(
         "/api/v1/resources/R1/status",
@@ -85,6 +88,32 @@ def test_create_and_patch_resource_as_admin(client, make_token):
     )
     assert patch_response.status_code == 200
     assert patch_response.json()["item"]["status"] == "maintenance"
+
+
+def test_create_resource_invalid_payload_returns_validation_details(client, make_token):
+    admin_token = make_token(username="admin", role="admin")
+    response = client.post(
+        "/api/v1/resources",
+        cookies={"access_token": admin_token},
+        json={"resourceCode": "", "name": "Clinic A", "type": "clinic", "slotDurationMin": 1},
+    )
+
+    assert response.status_code == 400
+    payload = response.json()
+    assert payload["error"] == (
+        "Invalid request payload: resourceCode: String should have at least 1 character; "
+        "slotDurationMin: Input should be greater than or equal to 5"
+    )
+    assert {
+        "loc": ["resourceCode"],
+        "message": "String should have at least 1 character",
+        "type": "string_too_short",
+    } in payload["details"]
+    assert {
+        "loc": ["slotDurationMin"],
+        "message": "Input should be greater than or equal to 5",
+        "type": "greater_than_equal",
+    } in payload["details"]
 
 
 def test_patch_unknown_resource_returns_404(client, make_token):
