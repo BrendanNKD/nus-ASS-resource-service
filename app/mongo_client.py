@@ -1,20 +1,33 @@
 from __future__ import annotations
 
 import logging
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlsplit, urlunsplit
 
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 
 from app.config import Settings
 
-
 logger = logging.getLogger(__name__)
+
+
+def add_credentials_to_uri(uri: str, username: str, password: str) -> str:
+    if not username:
+        return uri
+
+    parsed = urlsplit(uri)
+    if parsed.username:
+        return uri
+
+    auth = f"{quote_plus(username)}:{quote_plus(password)}@"
+    return urlunsplit(
+        (parsed.scheme, f"{auth}{parsed.netloc}", parsed.path, parsed.query, parsed.fragment)
+    )
 
 
 def build_mongo_uri(settings: Settings) -> str:
     if settings.db.uri:
-        return settings.db.uri
+        return add_credentials_to_uri(settings.db.uri, settings.db.username, settings.db.password)
 
     auth_prefix = ""
     if settings.db.username:

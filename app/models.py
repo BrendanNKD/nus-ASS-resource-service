@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
-
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 ResourceStatus = Literal["active", "inactive", "maintenance"]
 
@@ -46,6 +45,35 @@ class ResourceCreateRequest(BaseModel):
     model_config = {
         "populate_by_name": True,
     }
+
+
+class ResourceLocationPatchRequest(BaseModel):
+    site: str = Field(default=None)
+    building: str = Field(default=None)
+    floor: str = Field(default=None)
+    room: str = Field(default=None)
+    timezone: str = Field(default=None)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ResourcePatchRequest(BaseModel):
+    name: str = Field(default=None, min_length=1)
+    type: str = Field(default=None, min_length=1)
+    status: ResourceStatus = Field(default=None)
+    location: ResourceLocationPatchRequest = Field(default=None)
+    slot_duration_min: int = Field(default=None, alias="slotDurationMin", ge=5)
+    default_capacity: int = Field(default=None, alias="defaultCapacity", ge=1)
+    tags: list[str] = Field(default=None)
+    metadata: dict[str, Any] = Field(default=None)
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    @model_validator(mode="after")
+    def at_least_one_field(self) -> "ResourcePatchRequest":
+        if not self.model_fields_set:
+            raise ValueError("At least one field must be provided")
+        return self
 
 
 class ResourceStatusPatchRequest(BaseModel):

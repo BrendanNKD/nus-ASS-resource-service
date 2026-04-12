@@ -12,9 +12,14 @@ from pydantic import BaseModel, ValidationError
 
 from app.auth import AuthClaims, require_auth, require_role
 from app.config import Settings, load_settings_from_env, resolve_app_env
-from app.models import ResourceCreateRequest, ResourceStatus, ResourceStatusPatchRequest
+from app.models import (
+    ResourceCreateRequest,
+    ResourcePatchRequest,
+    ResourceStatus,
+    ResourceStatusPatchRequest,
+)
 from app.mongo_client import close_mongo, connect_mongo
-from app.repository import InMemoryResourceRepository
+from app.repository import create_resource_repository
 from app.secrets_loader import load_prod_secrets
 from app.valkey_client import close_valkey, connect_valkey
 
@@ -80,8 +85,8 @@ def create_app(
 
     app = FastAPI(title="NUS Resource Service", version="1.0.0")
     app.state.settings = settings
-    app.state.resource_repo = InMemoryResourceRepository()
     app.state.mongo = connect_mongo_fn(settings)
+    app.state.resource_repo = create_resource_repository(app.state.mongo, settings)
     app.state.valkey = connect_valkey_fn(settings)
 
     app.add_middleware(
@@ -162,6 +167,24 @@ def create_app(
             )
         return {
             "message": "Resource status updated",
+            "item": resource.model_dump(by_alias=True),
+        }
+
+    @app.patch("/api/v1/resources/{resource_code}")
+    async def patch_resource(
+        resource_code: str,
+        payload: Annotated[Any, Body()],
+        _: AuthClaims = Depends(require_role("admin")),
+    ) -> dict[str, object]:
+        patch_payload = validate_request_payload(ResourcePatchRequest, payload)
+        resource = app.state.resource_repo.update_resource(resource_code, patch_payload)
+        if resource is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"error": "Resource not found", "code": "RESOURCE_NOT_FOUND"},
+            )
+        return {
+            "message": "Resource updated",
             "item": resource.model_dump(by_alias=True),
         }
 

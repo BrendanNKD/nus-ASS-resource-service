@@ -90,6 +90,108 @@ def test_create_and_patch_resource_as_admin(client, make_token):
     assert patch_response.json()["item"]["status"] == "maintenance"
 
 
+def test_patch_resource_partial_update_as_admin(client, make_token):
+    admin_token = make_token(username="admin", role="admin")
+
+    create_response = client.post(
+        "/api/v1/resources",
+        cookies={"access_token": admin_token},
+        json={
+            "resourceCode": "R2",
+            "name": "Clinic A",
+            "type": "clinic",
+            "location": {
+                "site": "NUS",
+                "building": "University Health Centre",
+                "floor": "1",
+                "room": "A101",
+                "timezone": "Asia/Singapore",
+            },
+            "slotDurationMin": 30,
+            "defaultCapacity": 2,
+            "tags": ["room", "clinic"],
+            "metadata": {"source": "test"},
+        },
+    )
+    assert create_response.status_code == 201
+
+    patch_response = client.patch(
+        "/api/v1/resources/R2",
+        cookies={"access_token": admin_token},
+        json={"defaultCapacity": 4, "location": {"room": "A102"}},
+    )
+
+    assert patch_response.status_code == 200
+    payload = patch_response.json()
+    assert payload["message"] == "Resource updated"
+    assert payload["item"]["resourceCode"] == "R2"
+    assert payload["item"]["name"] == "Clinic A"
+    assert payload["item"]["type"] == "clinic"
+    assert payload["item"]["slotDurationMin"] == 30
+    assert payload["item"]["defaultCapacity"] == 4
+    assert payload["item"]["location"] == {
+        "site": "NUS",
+        "building": "University Health Centre",
+        "floor": "1",
+        "room": "A102",
+        "timezone": "Asia/Singapore",
+    }
+    assert payload["item"]["tags"] == ["room", "clinic"]
+    assert payload["item"]["metadata"] == {"source": "test"}
+
+
+def test_patch_resource_requires_admin(client, make_token):
+    user_token = make_token(username="alice", role="user")
+    response = client.patch(
+        "/api/v1/resources/R2",
+        cookies={"access_token": user_token},
+        json={"defaultCapacity": 4},
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {"error": "Forbidden", "code": "AUTH_FORBIDDEN"}
+
+
+def test_patch_resource_rejects_resource_code_update(client, make_token):
+    admin_token = make_token(username="admin", role="admin")
+    response = client.patch(
+        "/api/v1/resources/R2",
+        cookies={"access_token": admin_token},
+        json={"resourceCode": "R3"},
+    )
+
+    assert response.status_code == 400
+    payload = response.json()
+    assert (
+        payload["error"] == "Invalid request payload: resourceCode: Extra inputs are not permitted"
+    )
+    assert {
+        "loc": ["resourceCode"],
+        "message": "Extra inputs are not permitted",
+        "type": "extra_forbidden",
+    } in payload["details"]
+
+
+def test_patch_resource_invalid_capacity_returns_validation_details(client, make_token):
+    admin_token = make_token(username="admin", role="admin")
+    response = client.patch(
+        "/api/v1/resources/R2",
+        cookies={"access_token": admin_token},
+        json={"defaultCapacity": 0},
+    )
+
+    assert response.status_code == 400
+    payload = response.json()
+    assert payload["error"] == (
+        "Invalid request payload: defaultCapacity: Input should be greater than or equal to 1"
+    )
+    assert {
+        "loc": ["defaultCapacity"],
+        "message": "Input should be greater than or equal to 1",
+        "type": "greater_than_equal",
+    } in payload["details"]
+
+
 def test_create_resource_invalid_payload_returns_validation_details(client, make_token):
     admin_token = make_token(username="admin", role="admin")
     response = client.post(
@@ -123,6 +225,18 @@ def test_patch_unknown_resource_returns_404(client, make_token):
         cookies={"access_token": admin_token},
         json={"status": "inactive"},
     )
+    assert response.status_code == 404
+    assert response.json() == {"error": "Resource not found", "code": "RESOURCE_NOT_FOUND"}
+
+
+def test_patch_unknown_resource_fields_returns_404(client, make_token):
+    admin_token = make_token(username="admin", role="admin")
+    response = client.patch(
+        "/api/v1/resources/unknown",
+        cookies={"access_token": admin_token},
+        json={"defaultCapacity": 4},
+    )
+
     assert response.status_code == 404
     assert response.json() == {"error": "Resource not found", "code": "RESOURCE_NOT_FOUND"}
 

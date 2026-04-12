@@ -31,7 +31,7 @@ def test_load_database_secret_success():
         )
     )
     assert secret.username == "user"
-    assert secret.port == "5432"
+    assert secret.port == "27017"
 
 
 def test_load_prod_secrets_sets_expected_values():
@@ -41,12 +41,23 @@ def test_load_prod_secrets_sets_expected_values():
         if name == SECRET_JWT:
             return '{"JWT_ACCESS_PUBLIC_KEY":"pub","JWT_ACCESS_PRIVATE_KEY":"priv"}'
         if name == SECRET_DATABASE:
-            return '{"username":"u","password":"p","engine":"mongodb","host":"h","port":27017,"dbname":"d"}'
+            return json.dumps(
+                {
+                    "username": "u",
+                    "password": "p",
+                    "engine": "mongodb",
+                    "host": "h",
+                    "port": 27017,
+                    "dbname": "d",
+                }
+            )
         if name == SECRET_VALKEY:
             return '{"VALKEY_ADDR":"localhost:6379"}'
         raise RuntimeError("unexpected secret")
 
-    load_prod_secrets(getter=fake_getter, setter=lambda key, value: captured.__setitem__(key, value))
+    load_prod_secrets(
+        getter=fake_getter, setter=lambda key, value: captured.__setitem__(key, value)
+    )
 
     assert captured["JWT_ACCESS_PUBLIC_KEY"] == "pub"
     assert captured["DB_USERNAME"] == "u"
@@ -63,10 +74,21 @@ def test_load_prod_secrets_tolerates_missing_valkey():
         if name == SECRET_JWT:
             return '{"JWT_ACCESS_PUBLIC_KEY":"pub","JWT_ACCESS_PRIVATE_KEY":"priv"}'
         if name == SECRET_DATABASE:
-            return '{"username":"u","password":"p","engine":"mongodb","host":"h","port":27017,"dbname":"d"}'
+            return json.dumps(
+                {
+                    "username": "u",
+                    "password": "p",
+                    "engine": "mongodb",
+                    "host": "h",
+                    "port": 27017,
+                    "dbname": "d",
+                }
+            )
         if name == SECRET_VALKEY:
             raise RuntimeError("missing")
         raise RuntimeError("unexpected secret")
 
-    load_prod_secrets(getter=fake_getter, setter=lambda key, value: captured.__setitem__(key, value))
+    load_prod_secrets(
+        getter=fake_getter, setter=lambda key, value: captured.__setitem__(key, value)
+    )
     assert captured["DB_USERNAME"] == "u"
