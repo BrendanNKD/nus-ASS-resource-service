@@ -34,6 +34,14 @@ def test_load_settings_valkey_tls_defaults(monkeypatch):
     assert prod_settings.valkey.use_tls is True
 
 
+def test_load_settings_auth_service_session_defaults(monkeypatch):
+    monkeypatch.delenv("AUTH_REFRESH_COOKIE_NAME", raising=False)
+    monkeypatch.delenv("VALKEY_PREFIX", raising=False)
+    settings = load_settings_from_env()
+    assert settings.auth.refresh_cookie_name == "refresh_token"
+    assert settings.valkey.prefix == "auth:refresh"
+
+
 def test_load_settings_requires_key(monkeypatch):
     monkeypatch.delenv("JWT_ACCESS_PRIVATE_KEY", raising=False)
     monkeypatch.delenv("JWT_ACCESS_PUBLIC_KEY", raising=False)

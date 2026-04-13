@@ -4,7 +4,9 @@ Python/FastAPI resource service that validates auth cookies using the same JWT k
 
 ## Key Behaviors
 
-- Access token is read from cookie (`AUTH_ACCESS_COOKIE_NAME`, default `access_token`) or `Authorization: Bearer`.
+- Access token is read from cookie (`AUTH_ACCESS_COOKIE_NAME`, default `access_token`) or `Authorization: Bearer`, but protected requests must also include the refresh cookie.
+- Refresh session is checked in Valkey from the refresh cookie (`AUTH_REFRESH_COOKIE_NAME`, default `refresh_token`) before JWT verification.
+- Valkey refresh-session keys use `VALKEY_PREFIX` (default `auth:refresh`) and the auth-service key format.
 - JWT is verified with RS256 using `JWT_ACCESS_PUBLIC_KEY` (or public key derived from `JWT_ACCESS_PRIVATE_KEY`).
 - In `APP_ENV=prod`, secrets are loaded from AWS Secrets Manager:
   - `prod/jwt`
