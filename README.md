@@ -52,3 +52,10 @@ podman run -d `
   -e MONGODB_DATABASE=resource_db `
   -v mongodb-data:/bitnami/mongodb `
   docker.io/bitnami/mongodb:latest
+
+## Release Information
+
+<!-- release-start -->
+- Latest version: v1.0.2
+- Release date (UTC): 2026-04-13
+<!-- release-end -->
