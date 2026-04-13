@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 SECRET_JWT = "prod/jwt"
 # Keep the original secret name requested by the team, even though
 # resource-service now uses MongoDB.
-SECRET_DATABASE = "prod/postgres"
+SECRET_DATABASE = "prod/mongo"
 SECRET_POSTGRES = SECRET_DATABASE
 SECRET_VALKEY = "prod/valkey"
 
