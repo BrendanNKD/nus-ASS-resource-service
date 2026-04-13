@@ -25,6 +25,10 @@ from app.valkey_client import close_valkey, connect_valkey
 
 logger = logging.getLogger(__name__)
 RequestModelT = TypeVar("RequestModelT", bound=BaseModel)
+StatusFilter = Annotated[ResourceStatus | None, Query(alias="status")]
+TypeFilter = Annotated[str | None, Query(alias="type")]
+RequiredAuth = Annotated[AuthClaims, Depends(require_auth)]
+AdminAuth = Annotated[AuthClaims, Depends(require_role("admin"))]
 
 
 def serialize_validation_errors(errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -120,9 +124,9 @@ def create_app(
 
     @app.get("/api/v1/resources")
     async def list_resources(
-        status_filter: ResourceStatus | None = Query(default=None, alias="status"),
-        type_filter: str | None = Query(default=None, alias="type"),
-        claims: AuthClaims = Depends(require_auth),
+        claims: RequiredAuth,
+        status_filter: StatusFilter = None,
+        type_filter: TypeFilter = None,
     ) -> dict[str, object]:
         resources = app.state.resource_repo.list_resources(
             status=status_filter, resource_type=type_filter
@@ -135,8 +139,8 @@ def create_app(
 
     @app.post("/api/v1/resources", status_code=status.HTTP_201_CREATED)
     async def create_resource(
+        _: AdminAuth,
         payload: Annotated[Any, Body()],
-        _: AuthClaims = Depends(require_role("admin")),
     ) -> dict[str, object]:
         create_payload = validate_request_payload(ResourceCreateRequest, payload)
         try:
@@ -155,8 +159,8 @@ def create_app(
     @app.patch("/api/v1/resources/{resource_code}/status")
     async def patch_resource_status(
         resource_code: str,
+        _: AdminAuth,
         payload: Annotated[Any, Body()],
-        _: AuthClaims = Depends(require_role("admin")),
     ) -> dict[str, object]:
         patch_payload = validate_request_payload(ResourceStatusPatchRequest, payload)
         resource = app.state.resource_repo.set_status(resource_code, patch_payload.status)
@@ -173,8 +177,8 @@ def create_app(
     @app.patch("/api/v1/resources/{resource_code}")
     async def patch_resource(
         resource_code: str,
+        _: AdminAuth,
         payload: Annotated[Any, Body()],
-        _: AuthClaims = Depends(require_role("admin")),
     ) -> dict[str, object]:
         patch_payload = validate_request_payload(ResourcePatchRequest, payload)
         resource = app.state.resource_repo.update_resource(resource_code, patch_payload)
@@ -189,7 +193,7 @@ def create_app(
         }
 
     @app.get("/api/v1/auth/context")
-    async def auth_context(claims: AuthClaims = Depends(require_auth)) -> dict[str, object]:
+    async def auth_context(claims: RequiredAuth) -> dict[str, object]:
         return {
             "message": "Authenticated",
             "user": {"username": claims.username, "role": claims.role},

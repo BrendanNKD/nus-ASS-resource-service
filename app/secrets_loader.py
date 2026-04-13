@@ -9,7 +9,6 @@ from typing import Callable
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 
-
 logger = logging.getLogger(__name__)
 
 SECRET_JWT = "prod/jwt"
@@ -52,7 +51,10 @@ def load_secret_map(secret_name: str, getter: Callable[[str], str] = get_secret)
     return {str(k): str(v) for k, v in parsed.items()}
 
 
-def load_database_secret(secret_name: str = SECRET_DATABASE, getter: Callable[[str], str] = get_secret) -> DatabaseSecret:
+def load_database_secret(
+    secret_name: str = SECRET_DATABASE,
+    getter: Callable[[str], str] = get_secret,
+) -> DatabaseSecret:
     payload = getter(secret_name)
     parsed = json.loads(payload)
     if not isinstance(parsed, dict):
@@ -89,7 +91,10 @@ def load_database_secret(secret_name: str = SECRET_DATABASE, getter: Callable[[s
     )
 
 
-def set_env_from_map(values: dict[str, str], setter: Callable[[str, str], None] | None = None) -> None:
+def set_env_from_map(
+    values: dict[str, str],
+    setter: Callable[[str, str], None] | None = None,
+) -> None:
     set_env = setter or (lambda key, value: os.environ.__setitem__(key, value))
     for key, value in values.items():
         set_env(key, value)

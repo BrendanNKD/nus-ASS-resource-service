@@ -84,7 +84,7 @@ jobs:
           esac
 
           new_version="v$major.$minor.$patch"
-          echo "Bump: $bump → $new_version"
+          echo "Bump: $bump -> $new_version"
           echo "version=$new_version" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
@@ -98,7 +98,7 @@ jobs:
             .
 
       - name: Trivy Image Scan (gate)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.35.0
         with:
           image-ref: "${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.version.outputs.version }}"
           severity: CRITICAL
