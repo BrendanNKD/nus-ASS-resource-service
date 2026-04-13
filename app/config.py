@@ -27,6 +27,7 @@ class AuthConfig:
     issuer: str
     access_token_ttl_seconds: int
     access_cookie_name: str
+    refresh_cookie_name: str
 
 
 @dataclass(frozen=True)
@@ -127,6 +128,7 @@ def load_settings_from_env() -> Settings:
             issuer=os.getenv("JWT_ISSUER", "auth-service"),
             access_token_ttl_seconds=access_token_ttl_seconds,
             access_cookie_name=os.getenv("AUTH_ACCESS_COOKIE_NAME", "access_token"),
+            refresh_cookie_name=os.getenv("AUTH_REFRESH_COOKIE_NAME", "refresh_token"),
         ),
         cookie=CookieConfig(
             domain=os.getenv("COOKIE_DOMAIN", ""),
@@ -141,7 +143,7 @@ def load_settings_from_env() -> Settings:
             addr=os.getenv("VALKEY_ADDR", "localhost:6379"),
             password=os.getenv("VALKEY_PASSWORD", ""),
             db=valkey_db,
-            prefix=os.getenv("VALKEY_PREFIX", "resource:cache"),
+            prefix=os.getenv("VALKEY_PREFIX", "auth:refresh"),
             use_tls=valkey_use_tls,
         ),
     )
@@ -204,7 +206,9 @@ def normalize_pem_env(value: str) -> str:
     value = value.strip()
     if not value:
         return value
-    if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+    if (value.startswith('"') and value.endswith('"')) or (
+        value.startswith("'") and value.endswith("'")
+    ):
         value = value[1:-1]
     value = value.replace("\\r\\n", "\n").replace("\\n", "\n")
     value = value.replace("\r\n", "\n").replace("\r", "\n")

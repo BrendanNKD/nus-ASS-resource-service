@@ -7,7 +7,6 @@ import redis
 
 from app.config import Settings
 
-
 logger = logging.getLogger(__name__)
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 

@@ -1,9 +1,21 @@
 .venv/
 __pycache__/
 .pytest_cache/
+pytest-cache-files-*/
 .mypy_cache/
 .ruff_cache/
+cicd from auth/
 coverage.out
+coverage.xml
+test-report.xml
+reports/
+htmlcov/
+*.sarif
+*.cdx.json
+security-artifacts/
+ci-html-report/
+owasp-dependency-check-report/
+owasp-zap-baseline-report/
 .coverage
 .env
 *.pyc
